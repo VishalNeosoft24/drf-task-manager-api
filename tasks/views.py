@@ -2,11 +2,11 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 
-from tasks.permissions import IsOwnerOrAdmin
-from .serializers import TaskSerializer
+from tasks.permissions import IsOwnerOrAdmin, IsOwner
+from .serializers import CommentSerializer, TaskSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Task
+from .models import Task, TaskComment
 from django.shortcuts import get_object_or_404
 
 class CreateTaskView(APIView):
@@ -79,3 +79,41 @@ class RetriveUpdateTaskView(APIView):
         self.check_object_permissions(request, task)
         task.delete()
         return Response({"message":"Task Deleted Successfully",}, status=status.HTTP_200_OK)
+
+
+class AddCommentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CommentSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message":"Comment Added Successfully", "comment":serializer.data}, status=status.HTTP_201_CREATED)
+
+class ListUpdateCommentsView(APIView):
+    permission_classes = [IsAuthenticated, IsOwner]
+
+    def get(self, request, pk):
+        comments = TaskComment.objects.filter(task__id=pk)
+        if not (request.user.is_staff or request.user.is_superuser):
+            comments = comments.filter(user=request.user)
+
+        serializer = CommentSerializer(comments, many=True)
+        return Response({"message":"All Comments of Task", "comments":serializer.data}, status=status.HTTP_200_OK)
+    
+    def patch(self, request, pk):
+        comment = get_object_or_404(TaskComment, id=pk)
+        self.check_object_permissions(request, comment)
+        serializer = CommentSerializer(comment, data = request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message":"Comment updated", "comment":serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk):
+        comment = get_object_or_404(TaskComment, id=pk)
+        self.check_object_permissions(request, comment)
+        comment.delete()
+        return Response({"message":"Task Comment Deleted Successfully",}, status=status.HTTP_200_OK)
+
+
+

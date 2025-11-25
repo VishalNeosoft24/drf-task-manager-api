@@ -19,3 +19,15 @@ class TaskAdmin(admin.ModelAdmin):
     ]
     list_filter = ['user', 'status', 'priority', 'project']
     search_fields = ['user', 'project']
+
+@admin.register(TaskComment)
+class TaskCommentAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'task',
+        'user',
+        'comment',
+        'created_at',
+    ]
+    list_filter = ['user']
+    search_fields = ['user', 'task', 'comment']
