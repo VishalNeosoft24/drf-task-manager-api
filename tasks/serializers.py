@@ -1,4 +1,4 @@
-from rest_framework.serializers import ModelSerializer, Serializer, PrimaryKeyRelatedField
+from rest_framework.serializers import ModelSerializer, Serializer, PrimaryKeyRelatedField, HiddenField, CurrentUserDefault
 
 from users.models import User
 from .models import Task, TaskComment
@@ -56,3 +56,22 @@ class TaskSerializer(ModelSerializer):
                 setattr(instance, field, value)
         instance.save()
         return instance
+
+
+class CommentSerializer(ModelSerializer):
+    task = PrimaryKeyRelatedField(write_only = True, queryset = Task.objects.all())
+    user = HiddenField(default=CurrentUserDefault())
+
+    task_details = TaskSerializer(source='task', read_only=True)
+    class Meta:
+        model = TaskComment
+        fields = ['task', 'user', 'task_details', 'comment']
+        read_only_fields = ['created_at']
+
+
+    def create(self, validated_data):
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        validated_data.pop('task', None)
+        return super().update(instance, validated_data)
