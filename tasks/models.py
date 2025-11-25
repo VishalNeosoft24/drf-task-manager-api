@@ -17,10 +17,10 @@ class Task(models.Model):
         ("high", "High"),
     ]
 
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
     attachment = models.FileField(upload_to="attachments/", blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_tasks')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_tasks', null=True, blank=True)
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, related_name='tasks', null=True, blank=True)
     status = models.CharField(max_length=100, choices=STATUS_CHOICES, default="todo")
     priority = models.CharField(max_length=100, choices=PRIORITY_CHOICES, default="medium")
