@@ -65,8 +65,8 @@ class CommentSerializer(ModelSerializer):
     task_details = TaskSerializer(source='task', read_only=True)
     class Meta:
         model = TaskComment
-        fields = ['task', 'user', 'task_details', 'comment']
-        read_only_fields = ['created_at']
+        fields = ['id', 'task', 'user', 'task_details', 'comment', 'created_at']
+        read_only_fields = ['id', 'created_at']
 
 
     def create(self, validated_data):
