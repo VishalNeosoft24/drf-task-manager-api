@@ -23,6 +23,12 @@ class IsOwnerOrAdminMixin:
 
 
 class UserCreateViews(APIView):
+    def get(self, request):
+        users = User.objects.filter(is_superuser=False, is_staff=False)
+        serializer = UserSerializer(users, many=True)
+        return Response({"message":"All Users", "users":serializer.data}, status=status.HTTP_200_OK)
+
+
     def post(self, request):
         serializer = UserSerializer(data = request.data)
         if serializer.is_valid():
@@ -66,6 +72,14 @@ class UserDetailsGenericView(RetrieveUpdateAPIView):
 
 
 class UserLoginView(APIView):
+    http_method_names = ['post']
+
+    def get(self, request):
+        return Response(
+            {"detail": "GET not allowed. Use POST."},
+            status=405
+        )
+    
     def post(self, request):
         serializer = UserLoginSerializer(data = request.data)
         if serializer.is_valid():
