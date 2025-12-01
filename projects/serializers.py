@@ -12,7 +12,7 @@ class ProjectSerializer(ModelSerializer):
     def create(self, validated_data):
         request = self.context['request']
         project = Project.objects.create(**validated_data)
-        ProjectMember.objects.create(user=request.user, project=project)
+        ProjectMember.objects.create(user=request.user, project=project, role='owner')
         return project
 
 
@@ -22,7 +22,8 @@ class ProjectMemberAddSerializer(ModelSerializer):
 
     class Meta:
         model = ProjectMember
-        fields = ['project', 'user']
+        fields = ['project', 'user', 'role']
+        read_only_fields = ['role']
 
     def create(self, validated_data):
         return ProjectMember.objects.create(**validated_data)

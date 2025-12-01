@@ -73,7 +73,7 @@ class ListProjectMembersView(APIView):
                 "id": m.user.id,
                 "username": m.user.username,
                 "email": m.user.email,
-                "role": m.user.role,
+                "job_role": (m.user.job_role.replace("_", " ").title() if m.user.job_role else None),
                 "department": m.user.department,
                 "designation": m.user.designation
             } for m in members

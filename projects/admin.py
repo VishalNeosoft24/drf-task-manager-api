@@ -7,4 +7,4 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectMember)
 class ProjectMemberAdmin(admin.ModelAdmin):
-    list_display = ['id', 'user', 'project']
+    list_display = ['id', 'user', 'project', 'role']
