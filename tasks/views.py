@@ -1,25 +1,56 @@
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 
-from tasks.permissions import IsOwnerOrAdmin, IsOwner
+from tasks.permissions import IsOwnerOrAdmin, IsOwner, CreateTaskPermission
+from tasks.utils.pagination import TaskPagination
 from .serializers import CommentSerializer, TaskSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Task, TaskComment
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 class CreateTaskView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CreateTaskPermission]
+    pagination_class = TaskPagination
 
     def get(self, request):
         if request.user.is_staff or request.user.is_superuser:
-            tasks = Task.objects.all()
+            tasks = Task.objects.all().order_by('-id')
         else:
-            tasks = Task.objects.filter(user=request.user)
+            tasks = Task.objects.filter(user=request.user).order_by('-id')
+        
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            tasks = tasks.filter(status=status_filter)
+        project_filter = request.query_params.get("project")
+        if project_filter:
+            tasks = tasks.filter(project__id=project_filter)
+        priority_filter = request.query_params.get("priority")
+        if priority_filter:
+            tasks = tasks.filter(priority=priority_filter)
 
-        serializer = TaskSerializer(tasks, many=True)
-        return Response({"message":"Tasks retrieved successfully", "tasks":serializer.data}, status=status.HTTP_200_OK)
+        search_filter = request.query_params.get("search")
+        if search_filter:
+            tasks = tasks.filter(
+                Q(name__icontains=search_filter) |
+                Q(description__icontains=search_filter) 
+                # Q(comments__icontains=search_filter)
+            )
+        paginator = self.pagination_class()
+        paginated_tasks = paginator.paginate_queryset(tasks, request)
+
+        serializer = TaskSerializer(paginated_tasks, many=True)
+
+        return paginator.get_paginated_response({
+            "message": "Tasks fetched successfully",
+            "tasks": serializer.data,
+            "page_size": paginator.page_size,
+            "current_page": paginator.page.number,
+            "total_pages": paginator.page.paginator.num_pages
+        })
 
     def post(self, request):
         serializer = TaskSerializer(data=request.data, context={'request': request})

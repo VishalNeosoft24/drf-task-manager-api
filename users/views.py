@@ -3,6 +3,8 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.views import TokenRefreshView
+
 
 from users.permissions import IsOwnerOrAdmin
 from .serializers import UserLoginSerializer, UserSerializer
@@ -17,6 +19,9 @@ User = get_user_model()
 class IsOwnerOrAdminMixin:
     def check_owner_or_admin(self, request, user_obj):
         # allow if request.user is same user or is staff/superuser
+        print('request.user.pk: ', request.user.pk)
+        print('request.user: ', request.user.username)
+        print('user_obj.pk: ', user_obj.pk)
         if request.user.is_authenticated and (request.user.pk == user_obj.pk or request.user.is_staff):
             return True
         return False
@@ -47,6 +52,7 @@ class UserDetailsView(APIView, IsOwnerOrAdminMixin):
 
     def get(self, request, pk):
         user = get_object_or_404(User, id=pk)
+        print('user: ', user)
         if not self.check_owner_or_admin(request, user):
             return Response({"status":"error", "message": "You must be the owner or an admin to access this."}, status=status.HTTP_403_FORBIDDEN)
         serializer = UserSerializer(user)
@@ -76,7 +82,7 @@ class UserLoginView(APIView):
 
     def get(self, request):
         return Response(
-            {"detail": "GET not allowed. Use POST."},
+            {"message": "GET not allowed. Use POST."},
             status=405
         )
     
@@ -95,9 +101,26 @@ class UserLoginView(APIView):
                 return Response({"message":"User account is disabled"}, status=status.HTTP_403_FORBIDDEN)
 
             refresh = RefreshToken.for_user(user)
-            return Response({
+            res = Response({
                 "message": "Login successful",
-                "access": str(refresh.access_token),
-                "refresh": str(refresh)}, status=status.HTTP_200_OK)
+                "access": str(refresh.access_token)}, status=status.HTTP_200_OK)
+            # set refresh token in cookie
+            res.set_cookie(
+                key="refresh_token",
+                value=str(refresh),
+                httponly=True,
+                secure=True,
+                samesite="Lax",
+                path="/"
+            )
+            return res
         return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
+class CookieTokenRefreshView(TokenRefreshView):
+    def post(self, request, *args, **kwargs):
+        refresh = request.COOKIES.get("refresh_token")
+        if refresh is None:
+            return Response({"detail": "Refresh token missing"}, status=401)
+
+        request.data["refresh"] = refresh
+        return super().post(request, *args, **kwargs)

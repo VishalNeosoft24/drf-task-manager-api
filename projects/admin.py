@@ -8,3 +8,4 @@ class ProjectAdmin(admin.ModelAdmin):
 @admin.register(ProjectMember)
 class ProjectMemberAdmin(admin.ModelAdmin):
     list_display = ['id', 'user', 'project', 'role']
+    list_filter = ['user', 'project']
