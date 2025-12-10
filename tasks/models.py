@@ -42,3 +42,14 @@ class TaskComment(models.Model):
 
     def __str__(self):
         return f"Comment by {self.user} on {self.task}"
+
+
+# class TaskAttachment(models.Model):
+#     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='attachments')
+#     uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
+#     file = models.FileField(upload_to='task_attachments/')
+#     filename = models.CharField(max_length=255)
+#     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"{self.filename} - {self.task.title}"
