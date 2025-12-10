@@ -12,7 +12,7 @@ class IsProjectOwner(BasePermission):
         return request.data.get("project")
     
     def has_permission(self, request, view):
-        if request.user.is_staff:
+        if request.user.is_superuser:
             return True
         
         project_id = self.get_project_id(request, view)
@@ -47,8 +47,7 @@ class CanUpdateDeleteProject(BasePermission):
         project_id = view.kwargs.get("pk")
 
         return (
-            user.is_superuser or
-            user.is_staff or 
+            user.is_superuser or 
             ProjectMember.objects.filter(
                 project_id=project_id,
                 user=user,
