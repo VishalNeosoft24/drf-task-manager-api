@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'projects',
     'tasks',
     'users',
+    'analytics',
     'rest_framework_simplejwt',
 ]
 
