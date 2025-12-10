@@ -19,9 +19,6 @@ User = get_user_model()
 class IsOwnerOrAdminMixin:
     def check_owner_or_admin(self, request, user_obj):
         # allow if request.user is same user or is staff/superuser
-        print('request.user.pk: ', request.user.pk)
-        print('request.user: ', request.user.username)
-        print('user_obj.pk: ', user_obj.pk)
         if request.user.is_authenticated and (request.user.pk == user_obj.pk or request.user.is_staff):
             return True
         return False
@@ -52,7 +49,6 @@ class UserDetailsView(APIView, IsOwnerOrAdminMixin):
 
     def get(self, request, pk):
         user = get_object_or_404(User, id=pk)
-        print('user: ', user)
         if not self.check_owner_or_admin(request, user):
             return Response({"status":"error", "message": "You must be the owner or an admin to access this."}, status=status.HTTP_403_FORBIDDEN)
         serializer = UserSerializer(user)

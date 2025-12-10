@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
@@ -19,6 +20,7 @@ class UserSerializer(ModelSerializer):
         validate_password(password)
         user = User(**validated_data)
         user.set_password(raw_password=password)
+        user.date_of_joining = datetime.now().date()
         user.save()
         return user
     
