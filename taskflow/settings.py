@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'projects',
     'tasks',
     'users',
+    'analytics',
     'rest_framework_simplejwt',
 ]
 
@@ -151,12 +152,12 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,
+    "PAGE_SIZE": 50,
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=300),  # Access token expiration time
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),  # Refresh token expiration time
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),  # Refresh token expiration time
     "ROTATE_REFRESH_TOKENS": False,  # Set True if you want to rotate refresh tokens
     "BLACKLIST_AFTER_ROTATION": True,  # If using refresh token rotation, set this to True
     "UPDATE_LAST_LOGIN": True,  # Update the last login time
@@ -172,4 +173,10 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+
+    "AUTH_COOKIE": "refresh_token",
+    "AUTH_COOKIE_SECURE": True,
+    "AUTH_COOKIE_HTTP_ONLY": True,
+    "AUTH_COOKIE_PATH": "/",
+    "AUTH_COOKIE_SAMESITE": "Lax",
 }

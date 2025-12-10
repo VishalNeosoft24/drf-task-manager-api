@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework.serializers import ModelSerializer
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
@@ -9,9 +10,9 @@ User = get_user_model()
 class UserSerializer(ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'role', 'department', 'designation']
+        fields = ['id', 'username', 'password', 'first_name', 'last_name', 'email', 'job_role', 'department', 'designation', 'date_of_joining']
         extra_kwargs = {'password': {'write_only': True}}
-        read_only_fields = ['id', 'role']
+        read_only_fields = ['id', 'job_role', 'date_of_joining']
 
 
     def create(self, validated_data):
@@ -19,11 +20,13 @@ class UserSerializer(ModelSerializer):
         validate_password(password)
         user = User(**validated_data)
         user.set_password(raw_password=password)
+        user.date_of_joining = datetime.now().date()
         user.save()
         return user
     
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)
+        validated_data.pop('date_of_joining', None)
         validated_data.pop('department', None)
         validated_data.pop('designation', None)
 

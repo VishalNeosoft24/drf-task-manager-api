@@ -16,7 +16,7 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
 
     # Refresh Access Token
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', views.CookieTokenRefreshView.as_view(), name='token_refresh'),
 
     # Optional – verify token validity
     path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),

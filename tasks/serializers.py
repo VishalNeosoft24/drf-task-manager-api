@@ -1,8 +1,8 @@
-from rest_framework.serializers import ModelSerializer, Serializer, PrimaryKeyRelatedField, HiddenField, CurrentUserDefault
+from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField, HiddenField, CurrentUserDefault, ValidationError
 
 from users.models import User
 from .models import Task, TaskComment
-from projects.models import Project
+from projects.models import Project, ProjectMember
 from users.serializers import UserSerializer
 
 
@@ -45,7 +45,16 @@ class TaskSerializer(ModelSerializer):
 
     
     def create(self, validated_data):
-        validated_data['user'] = self.context['request'].user
+        user = self.context['request'].user
+        validated_data['user'] = user
+        project = validated_data['project']
+        is_member = ProjectMember.objects.filter(project=project, user=user).exists()
+
+        if not is_member:
+            raise ValidationError(
+                {"message": "You are not a member of this project."}
+            )
+
         task = Task.objects.create(**validated_data)
         task.save()
         return task
