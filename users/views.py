@@ -4,14 +4,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenRefreshView
-
-
 from users.permissions import IsOwnerOrAdmin
+from users.utils.pagination import UserPagination, paginate_queryset
 from .serializers import UserLoginSerializer, UserSerializer
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import RetrieveUpdateAPIView, CreateAPIView
 from django.contrib.auth import get_user_model
+import time
+
 
 User = get_user_model()
 
@@ -24,12 +25,34 @@ class IsOwnerOrAdminMixin:
         return False
 
 
-class UserCreateViews(APIView):
-    def get(self, request):
-        users = User.objects.filter(is_superuser=False, is_staff=False)
-        serializer = UserSerializer(users, many=True)
-        return Response({"message":"All Users", "users":serializer.data}, status=status.HTTP_200_OK)
+class UserListCreateViews(APIView):
+    pagination_class = UserPagination
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        if request.user.is_superuser :
+            users = User.objects.all()
+        elif request.user.is_staff:
+            users = User.objects.filter(is_superuser=False)
+        else:
+            users = User.objects.filter(is_superuser=False, is_staff=False)
+        users = users.order_by('-id')
+        search__query = request.query_params.get('search', None)
+        if search__query:
+            users = users.filter(username__icontains=search__query) | \
+                    users.filter(email__icontains=search__query) | \
+                    users.filter(first_name__icontains=search__query) | \
+                    users.filter(last_name__icontains=search__query)
+        time.sleep(1) #for simulating delay to check loading states in frontend
+        return paginate_queryset(
+            request=request,
+            queryset=users,
+            serializer_class=UserSerializer,
+            pagination_class=self.pagination_class,
+            message="All users fetched successfully"
+        )
+        
 
     def post(self, request):
         serializer = UserSerializer(data = request.data)

@@ -22,5 +22,5 @@ class UserAdmin(admin.ModelAdmin):
         'email_verified',
     ]
     list_filter = ['role']
-    search_fields = ['username', 'phone_number']
+    search_fields = ['username', 'phone_numer']
     
