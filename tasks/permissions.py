@@ -17,20 +17,27 @@ class IsOwner(BasePermission):
 
 
 class CreateTaskPermission(BasePermission):
-    message = "viewr has no permission to create a task"
+    message = "You don’t have permission to create a task"
+
     def has_permission(self, request, view):
         if request.method != "POST":
             return True
-        
-        project = request.data.get("project")
 
+        user = request.user
+
+        # SUPERADMIN & STAFF can create task anywhere
+        if user.is_superuser or user.is_staff:
+            return True
+
+        project = request.data.get("project")
         if not project:
+            self.message = "Project ID is required"
             return False
 
-        member = ProjectMember.objects.filter(project=project, user=request.user).first()
+        # Membership check
+        member = ProjectMember.objects.filter(project=project, user=user).first()
         if not member:
             return False
-        
-        allowed = ("owner", "admin", "member")
 
+        allowed = ("owner", "admin", "member")
         return member.role in allowed
