@@ -3,30 +3,41 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, DjangoModelPermissions, DjangoModelPermissionsOrAnonReadOnly
-
+from rest_framework.permissions import IsAuthenticated
 from projects.permissions import IsProjectOwner, CanCreateProject, CanUpdateDeleteProject
+from projects.permissions_constant.permission_utils import get_user_permissions
 from projects.serializers import ProjectMemberAddSerializer, ProjectSerializer
 from tasks.models import Task
-from tasks.utils.pagination import TaskPagination
+from .utils.pagination import ProjectPagination
 from .models import Project, ProjectMember
-from django.db.models import Q, Prefetch
+from django.db.models import Q, Prefetch, F, Max, Case, When, IntegerField, Value, Prefetch
+from django.db.models.functions import Coalesce
+
 
 class ProjectListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated, CanCreateProject]
     serializer_class = ProjectSerializer
     queryset = Project.objects.all()
-    pagination_class = TaskPagination
+    pagination_class = ProjectPagination
 
     def get_queryset(self):
         user = self.request.user
         if user.is_superuser:
-            return Project.objects.all()
-        # return Project.objects.filter(members__user=user).exclude(members__role ="viewer")
-        return Project.objects.filter(members__user=user)
+            qs = Project.objects.all()
+        else:
+            # qs = Project.objects.filter(members__user=user).exclude(members__role ="viewer")
+            qs = Project.objects.filter(members__user=user)
 
+        qs = qs.annotate(
+            last_activity=Coalesce(
+                Max("tasks__updated_at"),
+                F("updated_at"),
+                F("created_at")
+            )
+        ).order_by('-last_activity')
+        return qs
 
-    # ⭐ Custom POST Response
+    # Custom POST Response
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -41,7 +52,7 @@ class ProjectListCreateView(ListCreateAPIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        print('queryset: ', queryset)
+
         role = request.query_params.get("role")
         if role:
             queryset = queryset.filter(project__id=role)
@@ -54,13 +65,10 @@ class ProjectListCreateView(ListCreateAPIView):
                 # Q(comments__icontains=search_filter)
             )
         
-        project_search = request.query_params.get("projectsearch")
-        if project_search:
-            queryset = queryset.filter(
-                Q(name__icontains=project_search) |
-                Q(description__icontains=project_search)
-            )
-            print("Filtered Projects:", queryset)
+        role_filter = request.query_params.get("role_filter")
+        if role_filter:
+            queryset = queryset.filter(members__role=role_filter, members__user=request.user) 
+
         paginator = self.pagination_class()
         paginated_projects = paginator.paginate_queryset(queryset, request)
 
@@ -74,6 +82,7 @@ class ProjectListCreateView(ListCreateAPIView):
             "total_pages": paginator.page.paginator.num_pages
         })
 
+
 class ProjectRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, CanUpdateDeleteProject]
     serializer_class = ProjectSerializer
@@ -85,6 +94,44 @@ class ProjectRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
         if user.is_superuser:
             return Project.objects.all()
         return Project.objects.filter(members__user=user)
+    
+    def retrieve(self, request, *args, **kwargs):
+            project = self.get_object()   # DRF handles 404 safely
+            serializer = self.get_serializer(project)
+            project_summary = None
+
+            # 🔥 Get dynamic permissions for the requesting user
+            perms = get_user_permissions(request.user, project)
+
+            if request.user.is_staff or request.user.is_superuser  or request.user.role in ["owner", "admin"]:
+                project_tasks_summary = Task.objects.filter(project_id=project.id)
+                user_task_summary = Task.objects.filter(project_id=project.id, user=request.user)
+
+                project_summary = {
+                    "total_tasks": project_tasks_summary.count(),
+                    "todo_tasks": project_tasks_summary.filter(status="todo").count(),
+                    "in_progress_tasks": project_tasks_summary.filter(status="progress").count(),
+                    "completed_tasks": project_tasks_summary.filter(status="done").count(),
+                }
+
+            else:
+                user_task_summary = Task.objects.filter(user=request.user, project_id=project.id)
+
+            user_summary = {
+                "total_tasks": user_task_summary.count(),
+                "todo_tasks": user_task_summary.filter(status="todo").count(),
+                "in_progress_tasks": user_task_summary.filter(status="progress").count(),
+                "completed_tasks": user_task_summary.filter(status="done").count(),
+            }
+
+            # Merge the data with custom permissions
+            data = serializer.data
+            data["permissions"] = perms
+            data["summary"] = {
+                    "project_summary": project_summary,
+                    "user_summary": user_summary
+                }
+            return Response(data)
 
 
 class AddProjectMemberView(APIView):
@@ -119,24 +166,51 @@ class ListProjectMembersView(APIView):
     def get(self, request, pk):
         project = get_object_or_404(Project, id=pk)
 
-        # Prefetch tasks assigned to each user BUT only for this project.
-        # NOTE: Task.user.related_name == 'assigned_tasks' in your Task model.
+        # Fetch ONLY members
+
+        # members_qs = (
+        #     ProjectMember.objects.filter(project=project)
+        #     .select_related("user")
+        #     .prefetch_related(
+        #         Prefetch(
+        #             "user__assigned_tasks",
+        #             queryset=Task.objects.filter(project=project).order_by('-created_at')[:10],
+        #             to_attr="project_tasks"
+        #         )
+        #     )
+        # )
+
+        # Order requesting user first
         members_qs = (
-            ProjectMember.objects.filter(project=project)
+            ProjectMember.objects
+            .filter(project=project)
             .select_related("user")
+            .annotate(
+                is_me=Case(
+                    When(user=request.user, then=Value(0)),  # requested user first
+                    default=Value(1),
+                    output_field=IntegerField()
+                )
+            )
+            .order_by("is_me", "joined_at")  # keep stable order
             .prefetch_related(
                 Prefetch(
-                    "user__assigned_tasks",                       # related_name on Task.user
-                    queryset=Task.objects.filter(project=project).order_by('-created_at')[:10],# only tasks of this project
-                    to_attr="project_tasks"                       # will be available as user.project_tasks
+                    "user__assigned_tasks",
+                    queryset=Task.objects.filter(project=project, status__in=["todo", "progress"]).order_by("-created_at")[:10],
+                    to_attr="project_tasks"
                 )
             )
         )
 
+        # Fetch tasks created by users NOT in members list (superadmins/staff)
+        member_user_ids = members_qs.values_list("user_id", flat=True)
+
+        system_tasks = Task.objects.filter(project=project).exclude(user_id__in=member_user_ids)
+
+        # Build members list
         project_members = []
         for m in members_qs:
             user = m.user
-            # get tasks prefetched for this user for the current project
             tasks_for_user = getattr(user, "project_tasks", [])
 
             project_members.append({
@@ -160,13 +234,27 @@ class ListProjectMembersView(APIView):
                 "tasks_count": len(tasks_for_user),
             })
 
+        # Return superadmin tasks in a separate key
+        system_tasks_list = [
+            {
+                "id": t.id,
+                "name": t.name,
+                "status": t.status,
+                "priority": t.priority,
+                "due_date": t.due_date,
+                "created_by": t.user.username,
+            }
+            for t in system_tasks
+        ]
+
         return Response(
             {
                 "project_id": project.id,
                 "members_count": len(project_members),
-                "members": project_members
-            },
-            status=status.HTTP_200_OK
+                "members": project_members,
+                "system_tasks_count": len(system_tasks_list),
+                "system_tasks": system_tasks_list,
+            }, status=200
         )
 
 
@@ -178,7 +266,9 @@ class RemoveProjectMemberView(APIView):
         member = ProjectMember.objects.filter(
             user_id=member_id, 
             project_id=project_id
-        ).first()        
+        ).first() 
+        if member is None:
+            return Response({"error": "Member not found"}, status=status.HTTP_404_NOT_FOUND)       
         if member.user == request.user:
             return Response({"error":"You can not delete your self."}, status=status.HTTP_403_FORBIDDEN)
         if not member:

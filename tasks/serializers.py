@@ -1,5 +1,6 @@
-from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField, HiddenField, CurrentUserDefault, ValidationError
+from rest_framework.serializers import ModelSerializer, PrimaryKeyRelatedField, HiddenField, CurrentUserDefault, ValidationError, SerializerMethodField
 
+from projects.permissions_constant.permission_utils import get_user_permissions
 from users.models import User
 from .models import Task, TaskComment
 from projects.models import Project, ProjectMember
@@ -7,11 +8,17 @@ from users.serializers import UserSerializer
 
 
 class ProjectSerializer(ModelSerializer):
+    permissions = SerializerMethodField()
     class Meta:
         model = Project
-        fields = ['id','name']
+        fields = ['id','name', 'permissions']
         read_only_fields = ['id']
 
+    def get_permissions(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return {}
+        return get_user_permissions(request.user, obj)
 
 class TaskSerializer(ModelSerializer):
     # user = PrimaryKeyRelatedField(write_only=True, queryset=User.objects.all())
@@ -42,12 +49,20 @@ class TaskSerializer(ModelSerializer):
             # 'user': {'write_only': True},
             'project': {'write_only': True},
         }
-
     
     def create(self, validated_data):
         user = self.context['request'].user
-        validated_data['user'] = user
         project = validated_data['project']
+
+        # SUPERADMIN -> allowed without membership
+        if user.is_superuser:
+            return Task.objects.create(**validated_data, user=user)
+
+        # STAFF -> allowed but DO NOT auto add to ProjectMember
+        if user.is_staff:
+            return Task.objects.create(**validated_data, user=user)
+
+        # NORMAL USERS -> must be project members
         is_member = ProjectMember.objects.filter(project=project, user=user).exists()
 
         if not is_member:
@@ -55,9 +70,7 @@ class TaskSerializer(ModelSerializer):
                 {"message": "You are not a member of this project."}
             )
 
-        task = Task.objects.create(**validated_data)
-        task.save()
-        return task
+        return Task.objects.create(**validated_data, user=user)
     
     def update(self, instance, validated_data):
         for field, value in validated_data.items():

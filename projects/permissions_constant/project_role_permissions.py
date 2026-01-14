@@ -1,0 +1,38 @@
+PROJECT_ROLE_PERMISSION = {
+    "owner": {
+        "can_create_task": True,
+        "can_edit_task": True,
+        "can_delete_task": True,
+        "can_add_member": True,
+        "can_remove_member": True,
+        "can_update_project": True,
+        "can_delete_project": True,
+    },
+    "admin": {
+        "can_create_task": True,
+        "can_edit_task": True,
+        "can_delete_task": True,
+        "can_add_member": True,
+        "can_remove_member": False,
+        "can_update_project": True,
+        "can_delete_project": False,
+    },
+    "member": {
+        "can_create_task": True,
+        "can_edit_task": True,
+        "can_delete_task": False,
+        "can_add_member": False,
+        "can_remove_member": False,
+        "can_update_project": False,
+        "can_delete_project": False,
+    },
+    "viewer": {
+        "can_create_task": False,
+        "can_edit_task": False,
+        "can_delete_task": False,
+        "can_add_member": False,
+        "can_remove_member": False,
+        "can_update_project": False,
+        "can_delete_project": False,
+    },
+}
