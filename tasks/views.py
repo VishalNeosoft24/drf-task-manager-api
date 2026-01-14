@@ -1,15 +1,16 @@
+import logging
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from tasks.permissions import IsOwnerOrAdmin, IsOwner, CreateTaskPermission
 from tasks.utils.pagination import TaskPagination
+from tasks.utils.search_tasks_func import bump_task_search_version
 from tasks.utils.task_filters import apply_task_filters, get_base_tasks_queryset
 from .serializers import CommentSerializer, TaskSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Task, TaskComment
 from django.shortcuts import get_object_or_404
-from django.core.cache import cache
 
 class CreateTaskView(APIView):
     """
@@ -70,7 +71,7 @@ class CreateTaskView(APIView):
         if serializer.is_valid():
             serializer.save()
             # Invalidate search cache
-            cache.incr("task_search_version")
+            bump_task_search_version()
             return Response({"message":"Task created", "task":serializer.data}, status=status.HTTP_201_CREATED)
         else:
             return Response({"errors":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -146,7 +147,7 @@ class RetriveUpdateTaskView(APIView):
         if serializer.is_valid():
             serializer.save()
             # Invalidate search cache
-            cache.incr("task_search_version")
+            bump_task_search_version()
             return Response({"message":"Task Updated Successfully", "task":serializer.data}, status=status.HTTP_200_OK)
         else:
             return Response({"error":serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -163,7 +164,7 @@ class RetriveUpdateTaskView(APIView):
         self.check_object_permissions(request, task)
         task.delete()
         # Invalidate search cache
-        cache.incr("task_search_version")
+        bump_task_search_version()
         return Response({"message":"Task Deleted Successfully",}, status=status.HTTP_200_OK)
 
 

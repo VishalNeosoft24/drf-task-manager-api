@@ -6,6 +6,7 @@ from ..models import Task
 CACHE_TIMEOUT = 60 * 5   # 5 minutes
 MAX_CANDIDATES = 300
 THRESHOLD = 30
+TASK_SEARCH_VERSION_KEY = "task_search_version"
 
 
 def search_tasks(tasks, query):
@@ -62,3 +63,12 @@ def search_tasks(tasks, query):
             )
         )
     )
+
+def bump_task_search_version():
+    cache.set(
+        TASK_SEARCH_VERSION_KEY,
+        cache.get_or_set(TASK_SEARCH_VERSION_KEY, 0) + 1
+    )
+
+def get_task_search_version():
+    return cache.get("task_search_version", 0)
