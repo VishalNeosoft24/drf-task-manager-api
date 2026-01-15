@@ -18,7 +18,7 @@ class ProjectSerializer(ModelSerializer):
         request = self.context.get("request")
         if not request:
             return {}
-        return get_user_permissions(request.user, obj)
+        return get_user_permissions(user=request.user, project=obj)
 
 class TaskSerializer(ModelSerializer):
     # user = PrimaryKeyRelatedField(write_only=True, queryset=User.objects.all())
