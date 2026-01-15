@@ -12,7 +12,7 @@ from rest_framework import status
 from .models import Task, TaskComment
 from django.shortcuts import get_object_or_404
 
-class CreateTaskView(APIView):
+class CreateListTaskView(APIView):
     """
     API view to create a new task and list tasks with filtering and pagination.
     1. GET method:
@@ -50,7 +50,7 @@ class CreateTaskView(APIView):
         paginator = self.pagination_class()
         paginated_tasks = paginator.paginate_queryset(tasks, request)
 
-        serializer = TaskSerializer(paginated_tasks, many=True)
+        serializer = TaskSerializer(paginated_tasks, many=True, context={'request': request})
 
         return paginator.get_paginated_response({
             "message": "Tasks fetched successfully",
@@ -97,7 +97,7 @@ class RetriveUpdateDeleteTaskGenericView(RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
-class RetriveUpdateTaskView(APIView):
+class RetriveUpdateDeleteTaskView(APIView):
     """
     API view to retrieve, update, or delete a specific task by its ID.
     
